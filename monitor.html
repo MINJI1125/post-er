@@ -35,13 +35,16 @@
 html,body{ margin:0; height:100%; height:100dvh; }
 body{
   font-family:'HakgyoansimBareondotum','Apple SD Gothic Neo',sans-serif; color:var(--ink);
-  overflow:hidden; cursor:none; -webkit-font-smoothing:antialiased;
+  overflow:hidden; -webkit-font-smoothing:antialiased;
   background:
     radial-gradient(60% 54% at 4% 2%,   rgba(214,218,206,.55), transparent 70%),
     radial-gradient(54% 52% at 98% 98%, rgba(206,214,200,.50), transparent 72%),
     radial-gradient(44% 42% at 92% 6%,  rgba(228,224,210,.45), transparent 74%),
     #F1F1EC;
 }
+
+/* 전시 중에는 커서를 숨기되, 마우스를 움직이면 다시 나타난다 */
+body.hide-cursor, body.hide-cursor *{ cursor:none !important; }
 
 .grain{
   position:fixed; inset:0; z-index:60; pointer-events:none; opacity:.06; mix-blend-mode:multiply;
@@ -333,10 +336,13 @@ function showDone(url, id){
 let lastPosterUrl = '';
 const AUTO_PRINT = /(\?|&)autoprint=1/.test(location.search);
 
+/* 인쇄 용지 — 기본 A5. 주소 뒤에 ?paper=a4 를 붙이면 A4로 나간다 */
+const PAPER = (new URLSearchParams(location.search).get('paper') === 'a4') ? 'A4' : 'A5';
+
 function printImage(src){
   if (!src) return;
   const doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>POST-ER</title>'
-    + '<style>@page{ margin:6mm; }'
+    + '<style>@page{ size:' + PAPER + ' portrait; margin:4mm; }'
     + 'html,body{ margin:0; padding:0; background:#fff; height:100%; }'
     + 'body{ display:flex; align-items:center; justify-content:center; }'
     + 'img{ display:block; max-width:100%; max-height:100vh; width:auto; height:auto; }'
@@ -408,6 +414,20 @@ window.addEventListener('resize', () => {
 });
 
 renderGallery();
+
+/* ── 커서 자동 숨김 ──
+   마우스를 움직이면 보이고, 3초간 멈춰 있으면 숨는다.
+   전시 화면은 깔끔하게 두면서도 인쇄 버튼은 언제든 누를 수 있게 */
+let cursorTimer = null;
+function wakeCursor(){
+  document.body.classList.remove('hide-cursor');
+  clearTimeout(cursorTimer);
+  cursorTimer = setTimeout(() => document.body.classList.add('hide-cursor'), 3000);
+}
+['mousemove','mousedown','wheel','touchstart'].forEach(ev => {
+  window.addEventListener(ev, wakeCursor, { passive:true });
+});
+wakeCursor();
 
 /* 확대 제스처 차단 */
 ['gesturestart','gesturechange','gestureend'].forEach(function(t){
