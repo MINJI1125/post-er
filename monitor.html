@@ -54,6 +54,16 @@ body{ cursor:default; }
   position:fixed; inset:0; z-index:60; pointer-events:none; opacity:.06; mix-blend-mode:multiply;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='.5'/%3E%3C/svg%3E");
 }
+/* 앨범 비우기 — 평소엔 거의 안 보이다가 마우스를 움직이면 드러난다 */
+.reset-btn{
+  margin-top:12px; cursor:pointer; font-family:inherit; font-size:11px; letter-spacing:.02em;
+  padding:5px 13px; border-radius:999px; color:rgba(60,63,56,.5);
+  background:rgba(255,255,255,.5); border:1px solid rgba(60,63,56,.12);
+  opacity:0; transition:opacity .35s ease, color .2s ease, border-color .2s ease;
+}
+body:not(.hide-cursor) .reset-btn{ opacity:.75; }
+.reset-btn:hover{ opacity:1; color:#A8503C; border-color:rgba(168,80,60,.35); }
+
 .print-btn{
   margin-top:22px; cursor:pointer; font-family:inherit; font-size:14px;
   display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px;
@@ -160,6 +170,7 @@ body{ cursor:default; }
   <div class="gallery-head">
     <p class="gallery-title">POST<span class="g-ast"></span>ER</p>
     <p class="gallery-sub">지금까지 만들어진 포스터 <b id="galleryCount">0</b>점</p>
+    <button class="reset-btn" id="resetBtn" onclick="askClearGallery()">앨범 비우기</button>
   </div>
   <div class="gallery-grid" id="galleryGrid"></div>
   <p class="gallery-empty" id="galleryEmpty">첫 번째 포스터를 기다리는 중</p>
@@ -255,10 +266,30 @@ function addToGallery(thumb, id){
   list.push({ id, thumb, ts: Date.now() });
   saveGallery(list);
 }
-function clearGallery(){
+function clearGallery(silent){
   try { localStorage.removeItem(GALLERY_KEY); } catch(e){}
+  lastPosterUrl = '';
   renderGallery();
+  if (!silent && relay){                 /* 아이패드 쪽에 쌓인 것도 같이 비운다 */
+    try { relay.publish(TOPIC, JSON.stringify({ type:'gallery-clear' })); } catch(e){}
+  }
+  if (bc){ try { bc.postMessage({ type:'gallery-clear' }); } catch(e){} }
 }
+
+/* 실수로 지우는 일이 없게 한 번 물어본다 */
+function askClearGallery(){
+  const n = loadGallery().length;
+  if (!n){ return; }
+  if (confirm('앨범에 있는 포스터 ' + n + '점을 모두 지울까요?\n\n지우면 되돌릴 수 없습니다.')){
+    clearGallery();
+    show('gallery');
+  }
+}
+
+/* 키보드로도 — Shift + R */
+window.addEventListener('keydown', (e) => {
+  if (e.shiftKey && (e.key === 'R' || e.key === 'r')) askClearGallery();
+});
 
 
 /* 포스터가 많아지면 카드 크기를 줄여서 화면 안에 다 담는다 */
@@ -395,6 +426,7 @@ function handleSignal(msg){
   }
   else if (msg.type === 'idle'){ show('gallery', msg.id); }
   else if (msg.type === 'gallery-updated'){ renderGallery(); }
+  else if (msg.type === 'gallery-clear'){ clearGallery(true); }
 }
 
 if (bc) bc.onmessage = (e) => handleSignal(e.data);
